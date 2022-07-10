@@ -1,0 +1,119 @@
+// ==UserScript==
+// @name        barker
+// @namespace   https://fantorovevo.com/
+// @homepageURL https://fantorovevo.com/
+// @match       https://twitter.com/*
+// @grant       none
+// @version     1.1.3
+// @author      fantoro
+// @description Replaces all occurences of "twitter" on Twitter with "barkerer"
+// @updateURL   https://gist.githubusercontent.com/fantoro/0291c59de492789a12beb0d2b892e51d/raw/barkererify.js
+// @downloadURL https://gist.githubusercontent.com/fantoro/0291c59de492789a12beb0d2b892e51d/raw/barkererify.js
+// @run-at      document-idle
+// @require     https://openuserjs.org/src/libs/sizzle/GM_config.js
+// @grant       GM_getValue
+// @grant       GM_setValue
+// @grant       GM_registerMenuCommand
+// ==/UserScript==
+// aandric/dexterthebrave edited this to make it replace bark, too lazy to actually rewrite the code so i just replaced strings of text LOL
+// again, original author credited above
+
+/*
+ * 
+ *  Version 1.1.3
+ *  turns out it would Still replace text on some textboxes so I tried fixing that 
+ * 
+ */ 
+
+GM_config.init({
+  'id': 'barker',
+  'title': 'barker Settings',
+  'fields':
+  {
+    'ReplacementText':
+    {
+      'label': 'Replacement Text',
+      'type': 'text',
+      'default': 'barker'
+    }
+  },
+  'events':
+  {
+    'save': () => {
+      barkerTextTemplate = GM_config.get("ReplacementText").toLowerCase();
+      GM_config.close();
+    }
+  }
+})
+
+GM_registerMenuCommand("Settings", () => GM_config.open())
+
+var textToReplace = "twitter";
+var barkerTextTemplate = GM_config.get("ReplacementText").toLowerCase();
+
+function recurseTree(node, func) {
+  if (!(node instanceof HTMLElement || func instanceof Function)) return null; // invalid object/func passed
+  
+  let children = node.children;
+  for (let i=0; i < children.length; i++) {
+    let child = children[i];
+    if (child.tagName == "SCRIPT") {
+      continue;
+    }
+    else if (child.getAttribute("role") == "textbox" || child.getAttribute("data-text") == "true") {
+      continue;
+    }
+    recurseTree(child, func);
+  }
+  
+  if (children.length == 0) {
+    func(node);
+  }
+}
+
+function barkerify(node) {
+  let ogText = node.innerHTML;
+  
+  let indexOc = ogText.toLowerCase().indexOf(textToReplace);
+  if (indexOc < 0) return;
+                                             //        78901
+  let textBefore = ogText.slice(0, indexOc); // I love twittering
+  let textAfter = ogText.slice(indexOc+textToReplace.length, ogText.length);
+  
+  let ogTTR = ogText.slice(indexOc, indexOc+textToReplace.length);
+  
+  let barkerText = "";
+  
+  if (ogTTR[0] == ogTTR[0].toUpperCase())
+    barkerText += barkerTextTemplate[0].toUpperCase();
+  else
+    barkerText += barkerTextTemplate[0];
+  
+  if (ogTTR.slice(1, ogTTR.length) == ogTTR.slice(1, ogTTR.length).toUpperCase())
+    barkerText += barkerTextTemplate.slice(1, barkerTextTemplate.length).toUpperCase();
+  else
+    barkerText += barkerTextTemplate.slice(1, barkerTextTemplate.length);
+  
+  node.innerHTML = textBefore + barkerText + textAfter;
+  
+  barkerify(node); // recursively catch repeated occurrences
+}
+
+console.debug("Creating observer");
+const Observer = new MutationObserver((MRecords, Observer) => {
+  console.debug("Observer");
+  for (let i=0; i < MRecords.length; i++) {
+    let MRecord = MRecords[i];
+    let TargetElement = MRecord.target;
+    recurseTree(TargetElement, barkerify);
+  }
+});
+
+Observer.observe(document.body, {
+  subtree: true,
+  childList: true,
+  attributes: true
+})
+
+//barkerify(document.getElementById("react-root"));
+recurseTree(document.body, barkerify);
